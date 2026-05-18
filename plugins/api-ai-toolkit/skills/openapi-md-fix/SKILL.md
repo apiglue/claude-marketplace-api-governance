@@ -1,5 +1,5 @@
 ---
-name: openapi-comply
+name: openapi-md-fix
 description: Audit and fix an OpenAPI specification to comply with RESTful API design standards defined in api-design-standards.md
 argument-hint: Path to the OpenAPI specification file (JSON or YAML)
 allowed-tools: ["Read", "Write", "Edit", "Bash"]
