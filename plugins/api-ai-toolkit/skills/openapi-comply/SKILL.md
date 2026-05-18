@@ -141,28 +141,45 @@ Preserve any existing `minLength`/`maxLength` that is already set.
 
 ### Step 3 — Apply all fixes
 
-Edit the spec file and apply every fix you identified. Work systematically, rule by rule. Preserve all existing valid content exactly as-is — do not change anything that already complies.
+Derive the output path from the input path by inserting `-fixed` before the file extension. Examples:
+
+- `api.yaml` → `api-fixed.yaml`
+- `openapi.json` → `openapi-fixed.json`
+- `specs/contacts.yaml` → `specs/contacts-fixed.yaml`
+
+Write the full fixed content to the new output path using the Write tool. Do not modify the original file. Preserve all existing valid content exactly as-is — do not change anything that already complies.
 
 If the spec is JSON, write valid JSON. If it is YAML, write valid YAML. Preserve the original formatting style as much as possible (indentation, key ordering, etc.).
 
 ### Step 4 — Validate consistency
 
-After editing, re-read the file and verify:
+After writing, re-read the output file and verify:
 
 - All path parameter names match between `paths` keys and `parameters[].name` fields
 - No new violations were introduced
 - The file is valid JSON/YAML (run `python3 -c "import json,sys; json.load(sys.stdin)" < file` for JSON)
 
-Fix any remaining issues found.
+Fix any remaining issues by rewriting the output file.
 
-### Step 5 — Report
+### Step 5 — Verify compliance of the fixed file
+
+Re-read the output file and re-run every rule from Step 2 against it as a fresh audit. For each rule, record whether any violations remain.
+
+If violations remain:
+
+1. Fix them in the output file (rewrite it).
+2. Re-audit once more to confirm all violations are resolved.
+3. Repeat until the file is fully compliant or you determine a violation cannot be automatically resolved (note it for manual review).
+
+### Step 6 — Report
 
 Print a structured summary to the user:
 
 ```
 ## OpenAPI Compliance Report
 
-**File:** <path>
+**Original file:** <input path>
+**Fixed file:** <output path>
 **Total violations fixed:** <N>
 
 ### Fixes applied
@@ -184,6 +201,11 @@ Print a structured summary to the user:
 
 **Rule 2.3.2 — String limits**
 - <list fields where minLength/maxLength were added, or "No violations found">
+
+### Compliance verification
+
+**Result:** PASS / FAIL
+- <For each rule: "Rule X.Y — PASS" or "Rule X.Y — FAIL: <remaining violation details>">
 
 ### Manual review recommended
 <List any violations that could not be automatically resolved, or "None">
