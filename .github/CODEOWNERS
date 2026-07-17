@@ -1,0 +1,4 @@
+# Only @apiglue can approve and merge pull requests.
+# See https://docs.github.com/articles/about-code-owners/
+
+* @apiglue
