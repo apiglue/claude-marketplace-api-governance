@@ -9,7 +9,7 @@ allowed-tools: ["Read", "Write", "Edit", "Bash"]
 
 Fix all Spectral lint errors in an OpenAPI spec using the `api-design-standards` ruleset.
 
-**Inputs:** spec at `$ARGUMENTS` · ruleset at `./config/api-design-standards-ruleset.json`
+**Inputs:** spec at `$ARGUMENTS` · ruleset at `${CLAUDE_PLUGIN_ROOT}/config/api-design-standards-ruleset.json`
 
 ---
 
@@ -23,22 +23,28 @@ Verify the spec has `openapi` or `swagger`, `info.title`, `info.version`, and `p
 
 ### Step 2 — Ensure dependencies
 
-Run `node --version` — require Node.js ≥ 22, stop if not met.
+Run the following single command — require Node.js ≥ 22 and confirm Spectral is available:
 
-Run `npx @stoplight/spectral-cli --version 2>/dev/null || npm install -g @stoplight/spectral-cli` to ensure Spectral is available.
+```bash
+node --version && npx --yes @stoplight/spectral-cli --version
+```
+
+Stop if Node is missing or below v22. Stop if Spectral fails to load.
 
 ---
 
 ### Step 3 — Output path
 
-Insert `-fixed` before the extension (`api.yaml` → `api-fixed.yaml`). Copy the original to the output path now — never modify the original.
+Insert `-fixed-ruleset` before the extension (`api.yaml` → `api-fixed-ruleset.yaml`). Copy the original to the output path now — never modify the original.
+
+Read the output path file into context now. From this point on, every fix in Step 5 and Step 6 must be read from and written to the **output path only** — never touch `$ARGUMENTS`.
 
 ---
 
 ### Step 4 — Initial lint
 
 ```bash
-npx @stoplight/spectral-cli lint "$ARGUMENTS" --ruleset ./config/api-design-standards-ruleset.json --format json 2>&1 || true
+npx --yes @stoplight/spectral-cli lint "$ARGUMENTS" --ruleset "${CLAUDE_PLUGIN_ROOT}/config/api-design-standards-ruleset.json" --format json 2>&1 || true
 ```
 
 Parse the JSON array. Relevant fields: `code`, `message`, `severity` (0=error, 1=warning, 2–3=ignore), `path`.
@@ -47,34 +53,33 @@ Record initial error and warning counts. If both are zero, skip to Step 7.
 
 ---
 
-### Step 5 — Fix errors (max 5 iterations)
+### Step 5 — Fix errors (max 3 iterations)
 
-Repeat until 0 errors remain or 5 iterations exhausted:
+Repeat until 0 errors remain or 3 iterations exhausted:
 
-1. Read the output file.
-2. Apply all fixes using the rule table below.
-3. Write the output (preserve format and indentation; don't touch compliant values).
-4. Re-lint the output file: same command as Step 4 but targeting the output path.
-5. If 0 errors: exit loop. If iteration 5 and errors remain: note them, exit loop.
+1. Using the output path file's current content (already in context — never the original at `$ARGUMENTS`), apply fixes for **every violation** in the lint output in a single write operation — process the complete list before writing.
+2. Write the result to the output path (preserve format and indentation; don't touch compliant values). Never write to `$ARGUMENTS`.
+3. Re-lint the output file: same command as Step 4 but targeting the output path.
+4. If 0 errors: exit loop. If iteration 3 and errors remain: note them, exit loop.
 
 **Rule table:**
 
-| Rule code | Fix |
-|-----------|-----|
-| `RESTFUL-STD-1.1-NAMING-FUNDAMENTALS-API-NAME` | Strip non-alphanumeric/non-space chars from `info.title` |
-| `RESTFUL-STD-1.2-ENUM-UPPER-SNAKE-CASE` | Convert violating enum values to UPPER_SNAKE_CASE (split camelCase at word boundaries, replace non-word chars with `_`, uppercase all) |
-| `RESTFUL-STD-2.1.1-CONSISTENCY-FUNDAMENTALS-URI-PARAMS` | Rename path parameter to lowerCamelCase in both the path template string and the parameter's `name` field |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-PATH-PARAMS` | Add a concise contextual `description` to the path parameter |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-QUERY-PARAMS` | Add a concise contextual `description` to the query parameter |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-REQUEST-HEADERS` | Add a concise contextual `description` to the request header |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-RESPONSE-HEADERS` | Add a concise contextual `description` to the response header |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-REQUEST-BODY` | Add a concise contextual `description` to the request body |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-RESPONSE-BODY` | Add a concise contextual `description` to the response object |
-| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-COOKIES` | Add a concise contextual `description` to the cookie parameter |
-| `RESTFUL-STD-2.3.1-CONSISTENCY-FUNDAMENTALS-INTEGER-MAX` | Add `maximum` (pagination page → 10000, page size → 100, else → 2147483647) |
-| `RESTFUL-STD-2.3.1-CONSISTENCY-FUNDAMENTALS-INTEGER-MIN` | Add `minimum` (pagination → 1, else → 0) |
-| `RESTFUL-STD-2.3.2-CONSISTENCY-FUNDAMENTALS-STRING-MAXLENGTH` | Add `maxLength` (email → 254, name → 100, address → 200, uuid → 36, else → 255) |
-| `RESTFUL-STD-2.3.2-CONSISTENCY-FUNDAMENTALS-STRING-MINLENGTH` | Add `minLength` (uuid → 36, email → 5, else → 1) |
+| Rule code                                                                 | Fix                                                                                                                                    |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `RESTFUL-STD-1.1-NAMING-FUNDAMENTALS-API-NAME`                            | Strip non-alphanumeric/non-space chars from `info.title`                                                                               |
+| `RESTFUL-STD-1.2-ENUM-UPPER-SNAKE-CASE`                                   | Convert violating enum values to UPPER*SNAKE_CASE (split camelCase at word boundaries, replace non-word chars with `*`, uppercase all) |
+| `RESTFUL-STD-2.1.1-CONSISTENCY-FUNDAMENTALS-URI-PARAMS`                   | Rename path parameter to lowerCamelCase in both the path template string and the parameter's `name` field                              |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-PATH-PARAMS`      | Add a concise contextual `description` to the path parameter                                                                           |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-QUERY-PARAMS`     | Add a concise contextual `description` to the query parameter                                                                          |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-REQUEST-HEADERS`  | Add a concise contextual `description` to the request header                                                                           |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-RESPONSE-HEADERS` | Add a concise contextual `description` to the response header                                                                          |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-REQUEST-BODY`     | Add a concise contextual `description` to the request body                                                                             |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-RESPONSE-BODY`    | Add a concise contextual `description` to the response object                                                                          |
+| `RESTFUL-STD-2.1.2-CONSISTENCY-FUNDAMENTALS-DESCRIPTION-COOKIES`          | Add a concise contextual `description` to the cookie parameter                                                                         |
+| `RESTFUL-STD-2.3.1-CONSISTENCY-FUNDAMENTALS-INTEGER-MAX`                  | Add `maximum` (pagination page → 10000, page size → 100, else → 2147483647)                                                            |
+| `RESTFUL-STD-2.3.1-CONSISTENCY-FUNDAMENTALS-INTEGER-MIN`                  | Add `minimum` (pagination → 1, else → 0)                                                                                               |
+| `RESTFUL-STD-2.3.2-CONSISTENCY-FUNDAMENTALS-STRING-MAXLENGTH`             | Add `maxLength` (email → 254, name → 100, address → 200, uuid → 36, else → 255)                                                        |
+| `RESTFUL-STD-2.3.2-CONSISTENCY-FUNDAMENTALS-STRING-MINLENGTH`             | Add `minLength` (uuid → 36, email → 5, else → 1)                                                                                       |
 
 Descriptions must be precise and contextual — use the parameter name, type, HTTP method, and schema. Never use placeholder text.
 
@@ -83,9 +88,10 @@ Descriptions must be precise and contextual — use the parameter name, type, HT
 ### Step 6 — Fix warnings (optional)
 
 If warnings remain after Step 5, ask:
+
 > There are **N warning(s)**. Fix them too?
 
-- Yes → same iterative process (max 5 iterations), severity 1 only.
+- Yes → same iterative process (max 3 iterations), severity 1 only.
 - No → proceed to Step 7.
 
 ---

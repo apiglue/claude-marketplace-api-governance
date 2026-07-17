@@ -1,6 +1,6 @@
 ---
 name: openapi-md-fix
-description: Audit and fix an OpenAPI specification to comply with RESTful API design standards defined in api-design-standards.md
+description: Audit and fix an OpenAPI specification to comply with RESTful API design standards defined on this file
 argument-hint: Path to the OpenAPI specification file (JSON or YAML)
 allowed-tools: ["Read", "Write", "Edit", "Bash"]
 ---
@@ -12,19 +12,18 @@ You are an expert API designer. Your task is to audit and fix the provided OpenA
 ## Inputs
 
 - OpenAPI spec to fix: `$ARGUMENTS`
-- Standards file: `api-design-standards.md` (in the current working directory)
 
 ## Process
 
-### Step 1 — Read both files
+### Step 1 — Read the spec
 
-Read `api-design-standards.md` and the spec file at `$ARGUMENTS`. If `$ARGUMENTS` is empty or not provided, tell the user to provide a file path and stop.
+Read the spec file at `$ARGUMENTS`. If `$ARGUMENTS` is empty or not provided, tell the user to provide a file path and stop.
 
 Detect the file format (JSON or YAML) from the extension or content.
 
 ### Step 2 — Audit against each standard rule
 
-Work through every rule below. For each rule, find every violation in the spec. Build a complete list before making any edits.
+Scan the spec **once**, collecting all violations across all rules simultaneously before making any edits. Build a complete violation list for every rule before proceeding.
 
 ---
 
@@ -120,10 +119,11 @@ Preserve any existing `minimum`/`maximum` that is already set.
 
 Every schema with `type: "string"` must define both `minLength` and `maxLength`. If either is missing, add it.
 
-**Exceptions:** Strings with `format: "date-time"`, `format: "date"`, `format: "time"`, or `format: "uuid"` are exempt — the format already constrains the value. Strings with a `pattern` that fully constrains length are also exempt.
+**Exceptions:** Strings with `format: "date-time"`, `format: "date"`, or `format: "time"` are exempt — the format already constrains the value. Strings with a `pattern` that fully constrains length are also exempt.
 
 **Sensible defaults by context:**
 
+- UUID fields (`format: "uuid"`) → `minLength: 36, maxLength: 36`
 - Name fields (firstName, lastName, etc.) → `minLength: 1, maxLength: 100`
 - Email → `minLength: 5, maxLength: 254`
 - Short code/identifier → `minLength: 1, maxLength: 50`
@@ -141,7 +141,7 @@ Preserve any existing `minLength`/`maxLength` that is already set.
 
 ### Step 3 — Apply all fixes
 
-Derive the output path from the input path by inserting `-fixed` before the file extension. Examples:
+Derive the output path from the input path by inserting `-fixed-md` before the file extension. Examples:
 
 - `api.yaml` → `api-fixed.yaml`
 - `openapi.json` → `openapi-fixed.json`
@@ -151,27 +151,23 @@ Write the full fixed content to the new output path using the Write tool. Do not
 
 If the spec is JSON, write valid JSON. If it is YAML, write valid YAML. Preserve the original formatting style as much as possible (indentation, key ordering, etc.).
 
-### Step 4 — Validate consistency
+### Step 4 — Verify and patch (max 2 retries)
 
-After writing, re-read the output file and verify:
+Run the JSON/YAML syntax check against the output file (don't re-read it — use content already in context):
+
+```bash
+python3 -c "import json,sys; json.load(sys.stdin)" < <output-path>
+```
+
+Then audit the written content against every rule from Step 2:
 
 - All path parameter names match between `paths` keys and `parameters[].name` fields
 - No new violations were introduced
-- The file is valid JSON/YAML (run `python3 -c "import json,sys; json.load(sys.stdin)" < file` for JSON)
+- Each rule from Step 2 passes
 
-Fix any remaining issues by rewriting the output file.
+If any violations or syntax errors remain, fix them with a single rewrite of the output file. Repeat this check-and-fix cycle at most **2 times**. After 2 retries, note any unresolved violations for manual review.
 
-### Step 5 — Verify compliance of the fixed file
-
-Re-read the output file and re-run every rule from Step 2 against it as a fresh audit. For each rule, record whether any violations remain.
-
-If violations remain:
-
-1. Fix them in the output file (rewrite it).
-2. Re-audit once more to confirm all violations are resolved.
-3. Repeat until the file is fully compliant or you determine a violation cannot be automatically resolved (note it for manual review).
-
-### Step 6 — Report
+### Step 5 — Report
 
 Print a structured summary to the user:
 

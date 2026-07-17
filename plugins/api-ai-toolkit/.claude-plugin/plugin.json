@@ -1,7 +1,7 @@
 {
   "name": "api-ai-toolkit",
   "description": "An API toolkit focused on api design",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "author": {
     "name": "Marcelo"
   }
