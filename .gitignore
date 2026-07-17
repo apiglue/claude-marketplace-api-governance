@@ -1,0 +1,4 @@
+# Claude Local Files
+.claude/
+*.local.md
+openapi-non*.json

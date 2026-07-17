@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "apiglue-api-governance",
+  "description": "API governance and design tools for Claude Code",
+  "owner": {
+    "name": "Marcelo"
+  },
+  "plugins": [
+    {
+      "name": "api-ai-toolkit",
+      "description": "An API toolkit focused on api design",
+      "author": {
+        "name": "Marcelo"
+      },
+      "category": "development",
+      "source": "./plugins/api-ai-toolkit"
+    }
+  ]
+}
